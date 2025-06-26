@@ -57,26 +57,33 @@ NULL
 #' Gene ID Mapping
 #'
 #' @name Mapping
-#' @description A function to map gene identifiers and preprocess gene expression data
-#' for downstream analyses.
+#' @description A function to map gene identifiers and preprocess gene
+#'   expression data for downstream analyses.
 #'
 #' @param se_obj A `SummarizedExperiment` object containing:
 #'   - **Assay data**: A log2-transformed, normalized gene expression matrix,
-#'   where rows correspond to probes (e.g., ProbeID, TranscriptID, or Gene Symbol)
-#'     and columns correspond to samples. This should be stored in the `assay()` slot.
+#'   where rows correspond to probes (e.g., ProbeID, TranscriptID, or Gene
+#'   Symbol) and columns correspond to samples. This should be stored in the
+#'   `assay()` slot.
 #'   - **Row metadata**: A data frame with probe annotations, including at least the following columns:
 #'     - `"probe"`: Unique identifiers for the probes (e.g., ProbeID, TranscriptID or Gene Symbol).
 #'     - `"ENTREZID"`: Entrez Gene IDs corresponding to the probes.
 #'   - **Column metadata** (optional): Sample metadata stored in the `colData()` slot.
+#' @param RawCounts Logical. Indicates whether the assay data in `se_obj`
+#'   contains **raw RNA-seq counts**. If "TRUE", please provide matched gene
+#'   lengths in raw matedata.
 #'
-#' @param method A string specifying the method for resolving duplicate probes in microarray or RNA-seq data. Options include:
+#' @param method A string specifying the method for resolving duplicate probes
+#'   in microarray or RNA-seq data. Options include:
 #'   - `"iqr"`: Selects the probe with the highest interquartile range (IQR), typically used for short-oligo arrays (e.g., Affymetrix).
 #'   - `"mean"`: Chooses the probe with the highest average expression, commonly used for long-oligo arrays (e.g., Agilent, Illumina).
 #'   - `"max"`: Retains the probe with the highest expression value, often used for RNA-seq data.
 #'   - `"stdev"`: Selects the probe with the highest standard deviation.
 #'   - `"median"`: Chooses the probe with the highest median expression value.
-#' @param impute Logical (`TRUE` or `FALSE`). If `TRUE`, performs K-Nearest Neighbors (KNN) imputation to handle missing data (`NA` values).
-#' @param verbose Logical (`TRUE` or `FALSE`). If `TRUE`, displays progress messages during execution.
+#' @param impute Logical (`TRUE` or `FALSE`). If `TRUE`, performs K-Nearest
+#'   Neighbors (KNN) imputation to handle missing data (`NA` values).
+#' @param verbose Logical (`TRUE` or `FALSE`). If `TRUE`, displays progress
+#'   messages during execution.
 #'
 #' @return Returns a list containing two preprocessed gene expression datasets:
 #'   - `"x_NC"`: A `SummarizedExperiment` object containing: 1) The log2-transformed gene expression matrix
@@ -85,8 +92,9 @@ NULL
 #'   for single-sample predictor (SSP)-based methods; 2) clinical metadata.
 #'
 #'
-#' @details If gene symbols are used as row identifiers in the gene expression matrix, an additional `SYMBOL` column
-#' must be added to the feature table and renamed as`probe`.
+#' @details If gene symbols are used as row identifiers in the gene expression
+#'   matrix, an additional `SYMBOL` column must be added to the feature table
+#'   and renamed as`probe`.
 #'
 #' @examples
 #' data("OSLO2EMIT0obj")
@@ -99,15 +107,16 @@ NULL
 #'
 #' @export
 
-Mapping <- function(
-        se_obj,
-        method = c("max", "mean", "median", "iqr", "stdev"),
-        impute = TRUE,
-        verbose = TRUE) {
+Mapping <- function(se_obj,
+    RawCounts = FALSE,
+    method = c("max", "mean", "median", "iqr", "stdev"),
+    impute = TRUE,
+    verbose = TRUE) {
     method <- match.arg(method)
 
     arguments <- rlang::dots_list(
         se_obj = se_obj,
+        RawCounts = RawCounts,
         method = method,
         impute = impute,
         verbose = verbose,
@@ -152,7 +161,7 @@ Mapping <- function(
 #'   - `"External"`: Uses external medians (see `external` argument).
 #' @param internal Specifies the internal calibration strategy when `calibration
 #'   = "Internal"`. Options include:
-#'   - `"medianCtr"` (default): Median-centered calibration.
+#'   - `"-1"` (default): Median-centered calibration.
 #'   - `"meanCtr"`: Mean-centered calibration (aligned with `genefu.scale`).
 #'   - `"qCtr"`: Quantile-based calibration (aligned with `genefu.robust`).
 #' @param external Specifies the platform name (i.e., column name) for external
@@ -189,24 +198,28 @@ Mapping <- function(
 #' res <- BS_parker(
 #'     se_obj = OSLO2EMIT0obj$data_input$se_NC,
 #'     calibration = "Internal",
-#'     internal = "medianCtr",
+#'     internal = "-1",
 #'     Subtype = FALSE,
 #'     hasClinical = FALSE
 #' )
 #'
 #' @export
 
-BS_parker <- function(
-        se_obj,
-        calibration = "None",
-        internal = NA,
-        external = NA,
-        medians = NA,
-        Subtype = FALSE,
-        hasClinical = FALSE) {
+BS_parker <- function(se_obj,
+    calibration = "None",
+    internal = NA,
+    external = NA,
+    medians = NA,
+    Subtype = FALSE,
+    hasClinical = FALSE) {
     # Check if input is a SummarizedExperiment object
     if (!inherits(se_obj, "SummarizedExperiment")) {
         stop("Input must be a SummarizedExperiment object.")
+    }
+
+    ## maintain parameter
+    if (internal == "-1") {
+        internal <- "medianCtr"
     }
 
     ## Extract data from SummarizedExperiment
@@ -936,7 +949,7 @@ BS_Multi <- function(data_input,
                 BS_parker(
                     data_input$se_NC,
                     calibration = "Internal",
-                    internal = "medianCtr",
+                    internal = "-1",
                     Subtype = Subtype,
                     hasClinical = hasClinical
                 )
@@ -992,13 +1005,24 @@ BS_Multi <- function(data_input,
 
         if (method == "PCAPAM50") {
             message(method, " is running!")
-            return(
-                BS_PCAPAM50(
-                    data_input$se_NC,
-                    Subtype = Subtype,
-                    hasClinical = hasClinical
-                )
+            result <- tryCatch(
+                {
+                    # Attempt to run PCAPAM50
+                    BS_PCAPAM50(
+                        data_input$se_NC,
+                        Subtype = Subtype,
+                        hasClinical = hasClinical
+                    )
+                },
+                error = function(e) {
+                    # Error handling
+                    warning("PCAPAM50 failed in this iteration. Error: ")
+                    return(NULL) # Return NULL or a dummy tibble with NAs
+                }
             )
+
+            # Return result (or NULL if failed)
+            return(result)
         }
 
         if (method == "ssBC") {
@@ -1012,21 +1036,42 @@ BS_Multi <- function(data_input,
                     hasClinical = hasClinical
                 )
             } else {
-                res_ssBC <- BS_ssBC(
-                    data_input$se_NC,
-                    s = "ER",
-                    Subtype = Subtype,
-                    hasClinical = hasClinical
-                )
+                if (!is.null(samples_ER.icd) & length(samples_ERHER2.icd) < nrow(pheno)) {
+                    res_ssBC <- BS_ssBC(
+                        data_input$se_NC[, samples_ER.icd],
+                        s = "ER",
+                        Subtype = Subtype,
+                        hasClinical = hasClinical
+                    )
+                } else {
+                    res_ssBC <- BS_ssBC(
+                        data_input$se_NC,
+                        s = "ER",
+                        Subtype = Subtype,
+                        hasClinical = hasClinical
+                    )
+                }
             }
 
-            ## removing results for AUTO mode
+            ## Keep patients' results for AUTO mode
             if (!is.null(samples_ER.icd) &&
                 length(samples_ER.icd) < nrow(pheno)) {
-                idx <- !(res_ssBC$BS.all$PatientID %in% samples_ER.icd)
-                res_ssBC$BS.all[idx, 2:ncol(res_ssBC$BS.all)] <- NA
-            }
+                unprocessed_patients <- base::setdiff(pheno$PatientID, samples_ER.icd)
 
+                # Create NA-filled dataframe for unprocessed patients with matching structure
+                na_df <- data.frame(
+                    PatientID = unprocessed_patients,
+                    matrix(
+                        nrow = length(unprocessed_patients),
+                        ncol = ncol(res_ssBC$BS.all) - 1, # Subtract 1 for PatientID column
+                        dimnames = list(NULL, colnames(res_ssBC$BS.all)[-1])
+                    ),
+                    row.names = unprocessed_patients
+                )
+
+                res_ssBC$BS.all <- rbind(res_ssBC$BS.all, na_df)
+                res_ssBC$BS.all <- res_ssBC$BS.all[pheno$PatientID, ]
+            }
 
             return(res_ssBC)
         }
@@ -1042,20 +1087,43 @@ BS_Multi <- function(data_input,
                     hasClinical = hasClinical
                 )
             } else {
-                res_ssBC.v2 <- BS_ssBC(
-                    data_input$se_NC,
-                    s = "ER.v2",
-                    Subtype = Subtype,
-                    hasClinical = hasClinical
-                )
+                if (!is.null(samples_ERHER2.icd) & length(samples_ERHER2.icd) < nrow(pheno)) {
+                    res_ssBC.v2 <- BS_ssBC(
+                        data_input$se_NC[, samples_ERHER2.icd],
+                        s = "ER.v2",
+                        Subtype = Subtype,
+                        hasClinical = hasClinical
+                    )
+                } else {
+                    res_ssBC.v2 <- BS_ssBC(
+                        data_input$se_NC,
+                        s = "ER.v2",
+                        Subtype = Subtype,
+                        hasClinical = hasClinical
+                    )
+                }
             }
 
-            ## removing results for AUTO mode
+            ## Keep patients' results for AUTO mode
             if (!is.null(samples_ERHER2.icd) &&
                 length(samples_ERHER2.icd) < nrow(pheno)) {
-                idx <- !(res_ssBC.v2$BS.all$PatientID %in% samples_ERHER2.icd)
-                res_ssBC.v2$BS.all[idx, 2:ncol(res_ssBC.v2$BS.all)] <- NA
+                unprocessed_patients <- base::setdiff(pheno$PatientID, samples_ERHER2.icd)
+
+                # Create NA-filled dataframe for unprocessed patients with matching structure
+                na_df <- data.frame(
+                    PatientID = unprocessed_patients,
+                    matrix(
+                        nrow = length(unprocessed_patients),
+                        ncol = ncol(res_ssBC.v2$BS.all) - 1, # Subtract 1 for PatientID column
+                        dimnames = list(NULL, colnames(res_ssBC.v2$BS.all)[-1])
+                    ),
+                    row.names = unprocessed_patients
+                )
+
+                res_ssBC.v2$BS.all <- rbind(res_ssBC.v2$BS.all, na_df)
+                res_ssBC.v2$BS.all <- res_ssBC.v2$BS.all[pheno$PatientID, ]
             }
+
 
             return(res_ssBC.v2)
         }
@@ -1089,7 +1157,7 @@ BS_Multi <- function(data_input,
             )
 
             BS.all <- data.frame(
-                PatinetID = rownames(res_sspbc),
+                PatientID = rownames(res_sspbc),
                 BS = res_sspbc[, 1],
                 row.names = rownames(res_sspbc)
             )

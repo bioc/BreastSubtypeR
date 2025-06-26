@@ -62,16 +62,17 @@ overlapSets <- function(x, y) {
 #'   calibration for gene expression matrix by itself. "External" means
 #'   calibration by external cohort.
 #' @param internal Specify the strategy for internal calibration,
-#'   medianCtr(default), meanCtr and qCtr
+#'   "medianCtr" (default, median-centered), meanCtr and qCtr
 #' @param external Specify the platform name(which column) of external medians
 #'   calculated by train cohorts. When users want to use Medians prepared by
 #'   user selves, this parameter should be "Given.mdns", not platform name.
 #' @noRd
-docalibration <- function(y,
-    medians.all,
-    calibration = c("None", "Internal", "External"),
-    internal = NA,
-    external = NA) {
+docalibration <- function(
+        y,
+        medians.all,
+        calibration = c("None", "Internal", "External"),
+        internal = NA,
+        external = NA) {
     calibration <- match.arg(calibration)
 
     mq <- 0.05 ## presetting in genefu robust model
@@ -100,7 +101,7 @@ docalibration <- function(y,
                 tm <- overlapSets(medians, y)
                 y <- (tm$y - tm$x[, internal])
             } else {
-                stop("Invalid internal calibration method. Choose 'medianCtr', 'meanCtr', 'qCtr', or a valid column name from medians.all.")
+                stop("Invalid internal calibration method. Choose '-1', 'meanCtr', 'qCtr', or a valid column name from medians.all.")
             }
         },
         "External" = {
@@ -602,7 +603,11 @@ RORgroup <- function(
                     "ROR-PC Group (Subtype + Clinic + Prolif.Subtype)" = cprskg.Subtype,
                     check.names = FALSE
                 )
+            } else {
+                message("NODE infor is missing.")
             }
+        } else {
+            message("TSIZE infor is missing.")
         }
 
 
@@ -667,7 +672,7 @@ RORgroup <- function(
 #'   calibration for gene expression matrix by itself. "External" means
 #'   calibration by external cohort.
 #' @param internal Specify the strategy for internal calibration,
-#'   medianCtr(default), meanCtr and qCtr
+#'   "medianCtr" (median centered, default), meanCtr and qCtr
 #' @param external Specify the platform name(which column) of external medians
 #'   calculated by train cohorts. When users want to use Medians prepared by
 #'   user selves, this parameter should be "Given.mdns", not platform name.
@@ -1173,7 +1178,7 @@ makeCalls.PC1ihc <- function(mat,
     # select  = order(rv, decreasing = TRUE)[seq_len(dim(mat)[1])]
     # the input is PAM50 matrix --50 genes -- get from dimension
     pca <- prcomp(t(mat)) # [select,]
-    pc12 <- pca$x[, seq(1, 2, 1)] # get two principal
+    pc12 <- pca$x[, 1:2] # get two principal
     df.pc1 <- data.frame(
         PatientID = rownames(pc12),
         PC1 = pc12[, 1],
@@ -1223,8 +1228,8 @@ makeCalls.PC1ihc <- function(mat,
     ERN.pc1ihc <- df.pca1[which(!grepl("^L", df.pca1$IHC) &
         df.pca1$PC1 > mean(num.min)), ]
 
-    dim(ERP.pc1ihc)
-    dim(ERN.pc1ihc)
+    # dim(ERP.pc1ihc)
+    # dim(ERN.pc1ihc)
 
     if (dim(ERP.pc1ihc)[1] < dim(ERN.pc1ihc)[1]) {
         temp <- ERN.pc1ihc
