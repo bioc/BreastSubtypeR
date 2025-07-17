@@ -38,9 +38,9 @@ Imports:
 Suggests:
     shiny (>= 1.9.1),
     bslib (>= 0.8.0),
+    BiocStyle,
     knitr,
     rmarkdown,
-    BiocStyle,
     testthat
 URL: https://github.com/yqkiuo/BreastSubtypeR
 BugReports: https://github.com/yqkiuo/BreastSubtypeR/issues
