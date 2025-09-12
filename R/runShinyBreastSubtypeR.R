@@ -1,89 +1,82 @@
-#' @title iBreastSubtypeR
+#' Launch the iBreastSubtypeR Shiny app
 #'
-#' @description Starts an interactive BreastSubtypeR shiny web app.
+#' @description Starts the Shiny UI bundled with the BreastSubtypeR package.
+#' The launcher can (optionally) attach Shiny/Bslib so UI/server can use
+#' unqualified functions like `tags`, `icon`, `fileInput`, etc.
 #'
-#'   BreastSubtypeR integrates intrinsic molecular subtyping methods for breast
-#'   cancer, including nearest-centroid (NC-based) and single-sample predictor
-#'   (SSP-based) approaches. It employs standardized input and output formats,
-#'   providing a unified framework that is highly compatible with other R
-#'   packages in the gene expression profiling field.
+#' @param attach Character vector of packages to attach before launch.
+#'        Defaults to c("shiny","bslib"). Set to character(0) to skip attaching.
+#' @param attach_tidyverse Logical; if TRUE and tidyverse is installed, it will
+#'        be attached quietly for the session (purely optional).
+#' @param max_upload_mb Numeric; Shiny upload size limit (in MB). Default 1000.
+#' @return Opens the app; returns the value of `shiny::runApp()`.
 #'
-#'   The `iBreastSubtypeR()` function launches an interactive Shiny web
-#'   application. This app enables users to configure the arguments of subtyping
-#'   functions and execute subtyping on their local computer. For detailed
-#'   descriptions of the arguments, including their default and alternative
-#'   values, please refer to the manual pages of the respective functions.
-#'
-#'   Step 1:
-#'
-#'   The input data can be loaded from the user's workspace or by selecting a
-#'   CSV/text file for the expression data, a CSV/text file for clinical
-#'   information, and a CSV/text file for feature annotations.
-#'
-#'   After loading the necessary files, users can click the "Map Now" button
-#'   once and wait for the notification. If the Mapping() function runs
-#'   successfully, a message will appear stating, "You may now proceed to Step
-#'   2."
-#'
-#'
-#'
-#'   Step 2:
-#'
-#'   Users can select the desired subtyping method and adjust the relevant
-#'   parameters to conduct their analysis. Once the analysis is complete, a
-#'   message will indicate, "Analysis is complete." Two visualizations will be
-#'   displayed, and you will have the option to download the results as a text
-#'   file. If you wish to continue your analysis, you can directly run another
-#'   method without needing to repeat Step 1.
-#'
-#' @importFrom SummarizedExperiment SummarizedExperiment
-#' @importFrom SummarizedExperiment colData
-#' @importFrom SummarizedExperiment rowData
-#' @importFrom SummarizedExperiment assay
-#'
-#' @usage iBreastSubtypeR()
-#'
-#' @return A table with subtyping and ROR score
-#'
-#'
-#' @aliases iBreastSubtypeR
-#'
-#' @name iBreastSubtypeR
-#'
-#' @rdname iBreastSubtypeR
-#'
-#' @keywords BreastSubtypeR Shiny
 #' @examples
-#'
-#' library(BreastSubtypeR)
-#'
-#' # This will open your browser with the BreastSubtypeR shiny web app
 #' \donttest{
+#' # Basic
 #' iBreastSubtypeR()
+#'
+#' # Skip attaching packages (if UI/server fully qualify all calls)
+#' iBreastSubtypeR(attach = character(0))
 #' }
 #'
 #' @export
-iBreastSubtypeR <- function() {
-    shinydeps <- c("shiny", "bslib")
-    maskshinydeps <- shinydeps %in% installed.packages()
-    if (any(!maskshinydeps)) {
-        stop(
-            sprintf(
-                "Please install the following packages :\n\n  %s\n",
-                paste(shinydeps[!maskshinydeps], collapse = ", ")
+iBreastSubtypeR <- function(
+        attach = c("shiny", "bslib"),
+        attach_tidyverse = FALSE,
+        max_upload_mb = 1000) {
+    # helper: check install + attach quietly
+    .attach_if <- function(pkgs) {
+        pkgs <- unique(pkgs)
+        if (!length(pkgs)) {
+            return(invisible(NULL))
+        }
+        installed <- rownames(utils::installed.packages())
+        missing <- setdiff(pkgs, installed)
+        if (length(missing)) {
+            stop(
+                sprintf(
+                    "Please install required package(s) before launching the app: %s",
+                    paste(missing, collapse = ", ")
+                ),
+                call. = FALSE
             )
+        }
+        # Attach to search path so ui.R/server.R can use unqualified calls
+        for (p in pkgs) {
+            suppressPackageStartupMessages(
+                requireNamespace(p, character.only = TRUE, quietly = TRUE, warn.conflicts = FALSE)
+            )
+        }
+        invisible(NULL)
+    }
+
+    # Attach Shiny/Bslib (and optionally tidyverse) for this R session
+    .attach_if(attach)
+    if (isTRUE(attach_tidyverse) && "tidyverse" %in% rownames(utils::installed.packages())) {
+        suppressPackageStartupMessages(
+            requireNamespace("tidyverse", quietly = TRUE, warn.conflicts = FALSE, character.only = TRUE)
         )
     }
 
+    # App directory shipped inside the package
     appDir <- system.file("ShinyBreastSubtypeR", package = "BreastSubtypeR")
-    if (appDir == "") {
-        stop("The iBreastSubtypeR cannot be found within the package.")
+    if (identical(appDir, "") || !dir.exists(appDir)) {
+        stop("Shiny app directory 'inst/ShinyBreastSubtypeR' not found in the package.", call. = FALSE)
     }
 
+    # Increase upload limit (MB -> bytes)
+    options(shiny.maxRequestSize = max_upload_mb * 1024^2)
 
-    ## increase file limit
-    options(shiny.maxRequestSize = 1000 * 1024^2)
+    shiny::runApp(appDir, display.mode = "normal")
+}
 
-
-    shiny::runApp(appDir)
+#' @title (Deprecated) Run iBreastSubtypeR
+#' @description Back-compat wrapper; use [iBreastSubtypeR()] instead.
+#' @param ... Arguments passed on to [iBreastSubtypeR()].
+#' @export
+runShinyBreastSubtypeR <- function(...) {
+    .Deprecated("iBreastSubtypeR", package = "BreastSubtypeR",
+                msg = "runShinyBreastSubtypeR() is deprecated; use iBreastSubtypeR().")
+    iBreastSubtypeR(...)
 }
