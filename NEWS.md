@@ -1,18 +1,44 @@
-# BreastSubtypeR 1.1.1
+# BreastSubtypeR 1.1.3
 
-## Bug Fixes and Maintenance
-This patch release addresses minor issues identified after the initial 1.0.0 release while preserving all core functionality. Key fixes include:
-- Resolved input validation edge cases in the subtyping pipeline
-- Enhanced handling of cohorts with extreme ER+ ratios in AUTO mode
-- Corrected data type handling for raw counts input
-- Updated documentation typos and parameter descriptions
+## Highlights
+- Paper published in *NAR Genomics and Bioinformatics* (2025), **Editor’s Choice** (DOI: 10.1093/nargab/lqaf131).
+- **New:** Support for raw RNA-seq counts (requires gene lengths).
+- Major **iBreastSubtypeR** refresh: cleaner UX, smarter AUTO guidance, consistent exports.
+- Refined, data-driven thresholds for ER/HER2 skew detection in AUTO.
+- Broader input-validation across the subtyping pipeline.
 
-All core features remain fully functional:
-- **Comprehensive Intrinsic Subtyping for Breast Cancer**: Integrates multiple published intrinsic subtyping methods, including NC-based approaches like the original PAM50 (Parker et al., J Clin Oncol, 2009) and SSP-based methods like AIMS (Paquet et al., J Natl Cancer Inst, 2015).
-- **Multi-Method Subtyping Functionality**: Simultaneously predicts breast cancer intrinsic subtypes using a variety of validated methods for comparative analysis.
-- **AUTO Mode Feature**: Evaluates the distribution of ER and HER2 status in the test cohort to automatically select subtyping methods that align with the cohort's characteristics, ensuring compatibility with method-specific assumptions for greater accuracy and reliability.
-- **Optimized Gene Mapping**: Optimizes gene mapping using Entrez IDs to maximize the inclusion of genes across subtyping methods.
-- **Streamlined Input and Output**: Provides standardized input/output formats to ensure smooth integration with other gene expression analysis tools.
-- **User-Friendly Shiny App Interface**: Features a web-based GUI that runs entirely locally, ensuring data privacy with no online sharing, ideal for users who prefer a visual interface over R scripting.  
+## Bug Fixes
+- PAM50 variants no longer error with `calibration = "None"` or `"External"`.
+- ssBC variants handle datasets with <50 PAM50 genes more robustly.
+- Fixed `data.frame` issue (“`check.names` matched by multiple arguments”) via safe builders.
+- Removed duplicate “Subtype == BS_*class” columns in downloads.
+- Safer ROR merges on `PatientID` with clearer notifications.
+- Eliminated `jsonlite` named-vector warning in plotting.
 
-Users can safely upgrade from v1.0.0 for improved stability.
+## Shiny (iBreastSubtypeR)
+- New hero card + method chips (NC, SSP, ROR, AUTO) and “Why AUTO?” explainer modal.
+- **AIMS:** 4-class toggle disabled (AIMS is 5-class only).
+- **AUTO/AIMS/SSPBC:** Full-metrics export selector hidden.
+- Clear per-method help + PAM50 calibration notes.
+- Small UX polish: file dialogs + Mapping preserve scroll position.
+
+**Exports**
+- Two modes: **Calls only** and **Full metrics** (incl. ROR when available).
+- Standard column names: **`Call_5class`** / **`Call_4class`** (internal `BS` / `BS.Subtype` mapped).
+- **AUTO:** Calls = selected-k table (+ entropy); Full = selected-k merged with other-k (suffix `_4class` / `_5class`).
+- Filenames encode method, class, and mode (e.g., `results-PAM50-5class-full.txt`).
+
+**Behavior & Validation**
+- **ROR** only for NC methods when `TSIZE`/`NODE` exist and are numeric (auto coercion + warnings).
+- Stricter checks for **ssBC** subgroups (ER/HER2/TN presence and coding).
+- **AUTO** preflight warns on missing or mis-coded ER/HER2.
+
+## Core Features (unchanged)
+- Unified NC (PAM50, cIHC, PCAPAM50, ssBC) and SSP (AIMS, SSPBC) subtyping under one API.
+- `BS_Multi` with cohort-aware **AUTO** selection; `Mapping` for platform-agnostic preprocessing.
+- Interactive Shiny app with Bioconductor-friendly exports.
+
+## Upgrade Notes
+- Raw RNA-seq counts are supported **from v1.1.3 onward** (requires gene lengths).
+- If you previously parsed `BS` / `BS.Subtype`, switch to **`Call_5class` / `Call_4class`**.
+- Package API unchanged (the `Subtype` argument remains).
